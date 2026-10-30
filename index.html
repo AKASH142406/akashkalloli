@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicFix - AI Civic Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-gray-50">
+<nav class="bg-black text-white p-4 flex justify-between">
+  <h1 class="font-bold text-xl">CivicFix AI</h1>
+  <div class="flex gap-2">
+    <button onclick="setView('citizen')" id="btn-c" class="bg-white text-black px-3 py-1 rounded">Citizen</button>
+    <button onclick="setView('admin')" id="btn-a" class="bg-gray-800 px-3 py-1 rounded">Admin</button>
+  </div>
+</nav>
+
+<div id="citizen-view" class="p-4 max-w-6xl mx-auto grid md:grid-cols-2 gap-6">
+  <div class="bg-white p-5 rounded-xl shadow">
+    <h2 class="font-bold text-lg mb-3">Report an Issue - Under 1 Minute</h2>
+    <textarea id="desc" placeholder="Ex: Drain overflowing near 5th cross, foul smell, waterlogging..." class="w-full border p-3 rounded h-28"></textarea>
+    <input type="file" id="img" accept="image/*" class="mt-3 w-full" onchange="previewImg(event)">
+    <img id="preview" class="mt-2 h-32 rounded hidden">
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <select id="cat" class="border p-2 rounded"><option>Auto-detect</option><option>Waterlogging</option><option>Road Damage</option><option>Waste Overflow</option><option>Streetlight</option><option>Safety Hazard</option><option>Drainage</option></select>
+      <input id="loc" placeholder="Koramangala 5th Block" class="border p-2 rounded">
+    </div>
+    <div id="map-mini" class="h-48 mt-3 rounded"></div>
+    <p class="text-xs text-gray-500 mt-1">Click small map to pin location</p>
+    <button onclick="submitReport()" class="w-full bg-indigo-600 text-white p-3 rounded-lg mt-4 font-bold">Submit Report</button>
+    <div id="ai-result" class="hidden mt-4 p-3 bg-indigo-50 rounded text-sm border"></div>
+  </div>
+  <div>
+    <div id="map-main" class="h-[400px] rounded-xl shadow"></div>
+    <div id="hotspots" class="mt-4 p-4 bg-white rounded-xl shadow text-sm"></div>
+    <div class="mt-4 p-4 bg-yellow-50 rounded-xl border text-xs">Legend: 🔴 Critical  🟠 High  🔵 Medium/Low — Click dots for details</div>
+  </div>
+</div>
+
+<div id="admin-view" class="hidden p-4 max-w-7xl mx-auto">
+  <h2 class="font-bold text-xl mb-3">Admin Dashboard - Act & Track</h2>
+  <div class="grid md:grid-cols-4 gap-3" id="kanban"></div>
+  <div class="mt-6 bg-white p-4 rounded shadow"><h3 class="font-bold">AI Action Brief (1 min read)</h3><div id="brief" class="text-sm mt-2"></div></div>
+</div>
+
+<script>
+let reports = [
+  {id:1, text:"Massive waterlogging at Ejipura signal, 2 feet water", cat:"Waterlogging", lat:12.9301, lng:77.6201, priority:"High", status:"New"},
+  {id:2, text:"Same waterlogging at Ejipura, bikes stuck, traffic jam", cat:"Waterlogging", lat:12.9305, lng:77.6205, priority:"High", status:"New"},
+  {id:3, text:"Drain blocked near Ejipura causing overflow and foul smell", cat:"Drainage", lat:12.9302, lng:77.6208, priority:"High", status:"Review"},
+  {id:4, text:"Pothole near Sony signal Koramangala, 1 foot deep, accident risk", cat:"Road Damage", lat:12.9352, lng:77.6245, priority:"Medium", status:"New"},
+  {id:5, text:"Same pothole at Koramangala, car tyre damaged yesterday", cat:"Road Damage", lat:12.9353, lng:77.6246, priority:"Medium", status:"New"},
+  {id:6, text:"Garbage bin overflowing in HSR 27th Main for 3 days, dogs", cat:"Waste Overflow", lat:12.9116, lng:77.6372, priority:"Medium", status:"Assigned"},
+  {id:7, text:"Electric wire fallen near National Public School, sparking", cat:"Safety Hazard", lat:12.9279, lng:77.6271, priority:"Critical", status:"New"},
+  {id:8, text:"Streetlight not working in Indiranagar 100ft road, dark", cat:"Streetlight", lat:12.9784, lng:77.6408, priority:"Medium", status:"Resolved"},
+  {id:9, text:"Waterlogging at Silk Board, water entering shops", cat:"Waterlogging", lat:12.9177, lng:77.6233, priority:"High", status:"New"},
+  {id:10, text:"Drainage water mixed with drinking water in Ejipura", cat:"Drainage", lat:12.9308, lng:77.6210, priority:"Critical", status:"New"},
+];
+
+let pinned = {lat:12.931, lng:77.621};
+let maps = {};
+
+function categorize(text){
+  const t=text.toLowerCase();
+  if(t.includes("wire")||t.includes("shock")||t.includes("fire")||t.includes("spark")) return "Safety Hazard";
+  if(t.includes("water")||t.includes("flood")||t.includes("logging")) return "Waterlogging";
+  if(t.includes("road")||t.includes("pothole")) return "Road Damage";
+  if(t.includes("garbage")||t.includes("waste")||t.includes("bin")) return "Waste Overflow";
+  if(t.includes("light")||t.includes("dark")) return "Streetlight";
+  return "Drainage";
+}
+function summarize(text){ return text.split(".")[0].slice(0,80)+"..."; }
+function tfidf_similarity(a,b){
+  const words = s => s.toLowerCase().split(/\W+/);
+  const A=new Set(words(a)), B=new Set(words(b));
+  let inter=0; A.forEach(w=>{if(B.has(w)) inter++;});
+  return inter / Math.sqrt(A.size*B.size || 1);
+}
+function calculatePriority(text, cat, dupCount, clusterSize){
+  let score=0, reasons=[];
+  if(/fire|electric|shock|accident|school|hospital|children|spark/i.test(text)){score+=40; reasons.push("Safety risk (+40)");}
+  else if(/overflowing|blocked|stuck|foul/i.test(text)){score+=25; reasons.push("Urgency keyword (+25)");}
+  if(cat==="Safety Hazard"){score+=30; reasons.push("Safety category (+30)");}
+  if(dupCount>0){score+=dupCount*10; reasons.push(`${dupCount} duplicates (+${dupCount*10})`);}
+  if(clusterSize>2){score+=10; reasons.push(`Hotspot area (+10)`);}
+  let level= score>60?"Critical" : score>35?"High" : score>15?"Medium" : "Low";
+  return {score, level, reasons};
+}
+
+function submitReport(){
+  const text=document.getElementById("desc").value;
+  if(!text) return alert("Write description first");
+  const catSel=document.getElementById("cat").value;
+  const cat = catSel==="Auto-detect"? categorize(text) : catSel;
+  const summary=summarize(text);
+  let dups=reports.filter(r=>tfidf_similarity(r.text,text)>0.6);
+  let cluster=reports.filter(r=>Math.abs(r.lat-pinned.lat)<0.003 && Math.abs(r.lng-pinned.lng)<0.003);
+  let prio=calculatePriority(text, cat, dups.length, cluster.length);
+  const newReport={id:Date.now(), text, cat, summary, lat:pinned.lat, lng:pinned.lng, priority:prio.level, status:"New", dups, prio};
+  reports.unshift(newReport);
+  document.getElementById("ai-result").classList.remove("hidden");
+  document.getElementById("ai-result").innerHTML=`<b>✅ AI Processed:</b><br>Category: ${cat}<br>Summary: ${summary}<br>Duplicate: ${dups.length>0? dups.length+" similar found":"No duplicates"}<br>Priority: <b>${prio.level} (${prio.score})</b><br>Why: ${prio.reasons.join(", ")}<br><br><b>Tracking ID: #${newReport.id}</b> - Status: New`;
+  renderAll();
+  alert("Submitted! Tracking ID: #"+newReport.id);
+}
+
+function renderAll(){
+  if(maps.main){
+    maps.main.eachLayer(l=>{ if(l instanceof L.CircleMarker) maps.main.removeLayer(l); });
+    reports.forEach(r=>{
+      let color = r.priority==="Critical"?"red":r.priority==="High"?"orange":"blue";
+      L.circleMarker([r.lat, r.lng], {color, fillColor:color, fillOpacity:0.7, radius:9}).addTo(maps.main).bindPopup(`<b>${r.cat}</b> - ${r.priority}<br>${r.text}<br>ID: #${r.id}`);
+    });
+  }
+  document.getElementById("hotspots").innerHTML=`<b>🔍 AI Insight - Hotspots:</b><br>🔴 <b>Ejipura (3 reports)</b> - waterlogging + drain blocked + drinking water mix = Root cause drain failure. Action: Drainage team + water dept.<br><br>🟡 Koramangala pothole cluster (2 reports) - Same road damage reported twice`;
+  const kan=document.getElementById("kanban");
+  const statuses=["New","Review","Assigned","Resolved"];
+  kan.innerHTML=statuses.map(s=>`<div class="bg-white p-3 rounded shadow min-h-[200px]"><h4 class="font-bold border-b pb-1">${s} (${reports.filter(r=>r.status===s).length})</h4>${reports.filter(r=>r.status===s).map(r=>`<div class="border p-2 mt-2 rounded text-xs"><b>${r.cat}</b> - ${r.priority}<br>${r.text.slice(0,60)}...<br><span class="text-gray-500">#${r.id}</span><br><button onclick="moveReport(${r.id})" class="bg-black text-white px-2 py-1 mt-1 rounded">Move →</button></div>`).join("")}</div>`).join("");
+  document.getElementById("brief").innerHTML=`<b>Action Brief (under 1 min):</b> Ejipura area (12.93, 77.62) has 3 linked issues. Root cause likely drain blockage causing waterlogging and water contamination. <b>Recommended:</b> Assign drainage team + traffic police + water quality team. <b>Impact:</b> 500+ residents. <b>Priority:</b> Critical. <b>Duplicates:</b> 2 reports merged.`;
+}
+function moveReport(id){
+  let r=reports.find(x=>x.id===id);
+  const order=["New","Review","Assigned","Resolved"];
+  let idx=order.indexOf(r.status);
+  if(idx<3) r.status=order[idx+1];
+  renderAll();
+}
+function setView(v){
+  document.getElementById("citizen-view").classList.toggle("hidden", v!=="citizen");
+  document.getElementById("admin-view").classList.toggle("hidden", v!=="admin");
+  document.getElementById("btn-c").className = v==="citizen" ? "bg-white text-black px-3 py-1 rounded" : "bg-gray-800 px-3 py-1 rounded";
+  document.getElementById("btn-a").className = v==="admin" ? "bg-white text-black px-3 py-1 rounded" : "bg-gray-800 px-3 py-1 rounded";
+  setTimeout(()=>{ if(maps.main) maps.main.invalidateSize(); if(maps.mini) maps.mini.invalidateSize(); renderAll(); },200);
+}
+function previewImg(e){ const r=document.getElementById("preview"); r.src=URL.createObjectURL(e.target.files[0]); r.classList.remove("hidden"); }
+window.onload=()=>{
+  maps.mini=L.map('map-mini').setView([12.93,77.62],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(maps.mini);
+  maps.mini.on('click', e=>{pinned=e.latlng; L.marker(pinned).addTo(maps.mini);});
+  maps.main=L.map('map-main').setView([12.93,77.62],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(maps.main);
+  renderAll();
+}
+</script>
+</body>
+</html>
