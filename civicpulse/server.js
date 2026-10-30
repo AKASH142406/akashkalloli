@@ -102,7 +102,7 @@ function handleTile(req, res, pathname) {
     return serveFile(res, file, { cache: 'public, max-age=86400' });
   }
   // If a tile is outside the prefetched demo area, fall back to the public basemap.
-  res.writeHead(302, { Location: `https://a.basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png` });
+  res.writeHead(302, { Location: `https://tile.openstreetmap.de/${z}/${x}/${y}.png` });
   res.end();
 }
 

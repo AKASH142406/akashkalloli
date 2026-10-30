@@ -164,7 +164,7 @@ Skip the track page and the playground.
 | New report does not show CP-1001 as a duplicate | Make sure the pin is near Ejipura (the default) and the text mentions water/rain/flooding. The live check compares meaning, distance and time. |
 | The report form preview says “clear” | Wait for the 420 ms debounce, or move the pin closer to Ejipura. |
 | Ops drawer is empty after a reset | The reset restores the seed; the `CP-10xx` ID from before the reset no longer exists. Submit again or use a seed ID such as `CP-1009`. |
-| Map tiles are blank | The demo area is prefetched; outside it the server redirects to the CARTO CDN. Check internet access or stay near Ejipura/Koramangala. |
+| Map tiles are blank | The demo area is prefetched; outside it the server redirects to OpenStreetMap. Check internet access or stay near Ejipura/Koramangala. |
 | Embeddings are not ready | The server logs the fallback. The app still works with TF-IDF, but duplicate recall is lower. Run `npm run setup:model`, then restart. |
 | Port 4173 is busy | `PORT=4174 npm start` (PowerShell: `$env:PORT=4174; npm start`). |
 | Need a clean slate | `npm run reset`, or **Demo → Reset**. This also removes uploaded demo photos. |

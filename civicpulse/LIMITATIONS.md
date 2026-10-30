@@ -18,7 +18,7 @@ CivicPulse really does classify text, score duplicate similarity, compute an exp
 | Action briefs | **Real template** | Computed statistics filled into a fixed structure |
 | Ops workflow | **Real** | Status transitions, assignment, comments, confirmations, history |
 | Persistence | **Real but local** | JSON file, atomic replace, single process |
-| Map | **Real but limited** | Leaflet + 175 prefetched CARTO tiles for the demo area; CDN fallback |
+| Map | **Real but limited** | Leaflet + 175 prefetched OpenStreetMap tiles for the demo area; OpenStreetMap fallback |
 | Photo capture | **Real capture, no understanding** | Browser compression and storage only; no computer vision |
 | Dataset | **Simulated** | 63 synthetic reports, fictional names and addresses |
 | Localities / wards | **Approximate** | Centroids and ward labels for demo grouping, not official boundaries |
@@ -92,7 +92,7 @@ CivicPulse really does classify text, score duplicate similarity, compute an exp
 - **Single-process JSON store.** `data/state.json` is rewritten atomically, but there is no database, transaction isolation, concurrent-writer safety or migration path. Two server processes would fight over the file.
 - **No rate limiting.** Request body size is limited, but there is no per-IP or per-user throttling.
 - **No notifications.** Citizens see updates only by revisiting the track page. Staff get no alerts.
-- **No production map service.** 175 tiles are prefetched for the demo area at zoom 12–15. Outside that area the server redirects to the CARTO CDN, which requires internet access. The map is not a survey-grade basemap.
+- **No production map service.** 175 tiles are prefetched for the demo area at zoom 12–15. Outside that area the server redirects to OpenStreetMap, which requires internet access. The map is not a survey-grade basemap.
 - **Geolocation depends on browser permission.** The demo defaults to Ejipura so it works without permission.
 - **Accessibility and i18n are not audited.** The UI uses semantic HTML and keyboard-friendly controls, but there is no formal WCAG review and no localisation.
 - **Tests cover the AI core, not the UI.** `npm test` checks classification, duplicate scoring, priority, summaries, seed insights and the model card. The browser flows were tested manually; there is no automated end-to-end suite in the repo.

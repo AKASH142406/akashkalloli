@@ -1,4 +1,4 @@
-// Leaflet helpers. Tiles are served locally from /tiles with a CARTO fallback.
+// Leaflet helpers. Tiles are served locally from /tiles with an OpenStreetMap fallback.
 import { icon, catMeta, esc } from './ui.js';
 
 export const DEMO_CENTER = [12.936, 77.625];
@@ -14,10 +14,10 @@ export function createMap(el, { center = DEMO_CENTER, zoom = DEMO_ZOOM, interact
     dragging: interactive,
     tap: true,
   });
-  L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+  L.tileLayer('/tiles/{z}/{x}/{y}.png?v=2', {
     minZoom: 11,
     maxZoom: 16,
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    attribution: '&copy; OpenStreetMap contributors',
     crossOrigin: true,
   }).addTo(map);
   if (interactive) {

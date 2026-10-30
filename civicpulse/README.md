@@ -92,7 +92,7 @@ Node HTTP server (server.js, no web framework)
         ▼
 data/state.json                 JSON persistence (atomic replace)
 uploads/                        citizen photos
-public/tiles/                   prefetched CARTO light tiles, z12–15
+public/tiles/                   prefetched OpenStreetMap tiles, z12–15
 models/Xenova/bge-small-en-v1.5 local quantized embedding model (npm run setup:model)
 ```
 
