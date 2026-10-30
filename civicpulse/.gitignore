@@ -1,0 +1,21 @@
+# Runtime data
+data/state.json
+data/state.json.tmp
+uploads/
+
+# Dependencies
+node_modules/
+
+# Local embedding model (download with: npm run setup:model)
+models/
+
+# Logs and local test artefacts
+*.log
+.eval*.txt
+coverage/
+test-results/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

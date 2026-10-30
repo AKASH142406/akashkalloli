@@ -1,5 +1,7 @@
 # CivicFix AI - AI Powered Civic Platform
 
+> **Newer version:** The full CivicPulse prototype (Node server, local AI, 63 synthetic reports, staff workflow) is in [`civicpulse/`](./civicpulse/README.md). The original single-file CivicFix demo remains below.
+
 Live Demo: [YOUR NETLIFY LINK]
 
 ## Problem
